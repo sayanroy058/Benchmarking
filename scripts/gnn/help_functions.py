@@ -165,7 +165,7 @@ def validate_model_during_training(config: object,
     - scalers_validation (dict): x and pos scalers for validation data.
 
     Returns:
-    - tuple: Validation metrics including loss, R^2, Spearman, and Pearson correlations.
+    - tuple: Validation metrics including loss, R^2, Spearman, Pearson correlations, MAE, and Normalized MAE.
     """
     model.eval()
     val_loss = 0
@@ -219,6 +219,8 @@ def validate_model_during_training(config: object,
     node_predictions = torch.cat(node_predictions)
     r_squared = compute_r2_torch(preds=node_predictions, targets=actual_node_targets)
     spearman_corr, pearson_corr = compute_spearman_pearson(node_predictions, actual_node_targets)
+    mae = compute_mae_torch(node_predictions, actual_node_targets)
+    normalized_mae = compute_normalized_mae_torch(node_predictions, actual_node_targets)
 
     # Handle mode stats results if enabled
     if config.predict_mode_stats:
@@ -229,11 +231,13 @@ def validate_model_during_training(config: object,
             r_squared,
             spearman_corr,
             pearson_corr,
+            mae,
+            normalized_mae,
             val_loss_node_predictions,
             val_loss_mode_stats,
         )
     else:
-        return total_validation_loss, r_squared, spearman_corr, pearson_corr
+        return total_validation_loss, r_squared, spearman_corr, pearson_corr, mae, normalized_mae
 
 def validate_model_during_training_eign(
         config: object,
@@ -327,12 +331,14 @@ def validate_model_during_training_eign(
     spearman_corr, pearson_corr = compute_spearman_pearson(
         node_predictions, actual_node_targets
     )
+    mae = compute_mae_torch(node_predictions, actual_node_targets)
+    normalized_mae = compute_normalized_mae_torch(node_predictions, actual_node_targets)
 
     # Handle mode stats results if enabled
     if config.predict_mode_stats:
         raise NotImplementedError("EIGN model does not support mode stats prediction.")
     else:
-        return total_validation_loss, r_squared, spearman_corr, pearson_corr
+        return total_validation_loss, r_squared, spearman_corr, pearson_corr, mae, normalized_mae
 
 def compute_spearman_pearson(preds, targets, is_np=False) -> tuple:
     """
@@ -371,6 +377,57 @@ def compute_r2_torch(preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor
     ss_res = torch.sum((targets - preds) ** 2)
     r2 = 1 - ss_res / ss_tot
     return r2
+
+def compute_mae_torch(preds: torch.Tensor, targets: torch.Tensor) -> float:
+    """
+    Compute Mean Absolute Error (MAE) using PyTorch.
+
+    Parameters:
+    - preds (torch.Tensor): Predicted values.
+    - targets (torch.Tensor): Actual target values.
+
+    Returns:
+    - float: Computed MAE.
+    """
+    mae = torch.mean(torch.abs(preds - targets))
+    return mae.item()
+
+def compute_normalized_mae_torch(preds: torch.Tensor, targets: torch.Tensor) -> float:
+    """
+    Compute normalized MAE relative to the naive baseline.
+    
+    The naive baseline assumes that the predicted change in traffic volume 
+    for each edge is equal to the average observed change in traffic volume.
+    
+    Normalized MAE = 1 - (MAE / Naive_MAE)
+    
+    This ensures that:
+    - 1 represents perfect predictions (zero error)
+    - 0 indicates no improvement over the naive mean-based predictor
+    - Values can be negative if the model performs worse than the baseline
+    
+    Parameters:
+    - preds (torch.Tensor): Predicted values.
+    - targets (torch.Tensor): Actual target values.
+
+    Returns:
+    - float: Normalized MAE (ranging from 0 to 1 for good models).
+    """
+    # Compute model MAE
+    mae = torch.mean(torch.abs(preds - targets))
+    
+    # Compute naive baseline MAE (predicting the mean for all samples)
+    mean_targets = torch.mean(targets)
+    naive_predictions = torch.full_like(targets, mean_targets)
+    naive_mae = torch.mean(torch.abs(naive_predictions - targets))
+    
+    # Handle edge case where naive MAE is 0
+    if naive_mae.item() == 0:
+        return 1.0 if mae.item() == 0 else 0.0
+    
+    # Compute normalized MAE
+    normalized_mae = 1.0 - (mae / naive_mae)
+    return normalized_mae.item()
 
 def compute_r2_torch_with_mean_targets(mean_targets, preds, targets):
     ss_tot = torch.sum((targets - mean_targets) ** 2)

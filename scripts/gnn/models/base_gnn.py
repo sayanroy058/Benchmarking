@@ -201,7 +201,7 @@ class BaseGNN(nn.Module, ABC):
                 
             # Validation step
             if config.predict_mode_stats:
-                val_loss, r_squared, spearman_corr, pearson_corr, val_loss_node_predictions, val_loss_mode_stats = validate_model_during_training(
+                val_loss, r_squared, spearman_corr, pearson_corr, mae, normalized_mae, val_loss_node_predictions, val_loss_mode_stats = validate_model_during_training(
                     config=config,
                     model=self,
                     dataset=valid_dl,
@@ -217,13 +217,15 @@ class BaseGNN(nn.Module, ABC):
                     "r^2": r_squared,
                     "spearman": spearman_corr,
                     "pearson": pearson_corr,
+                    "mae": mae,
+                    "normalized_mae": normalized_mae,
                     "train_loss-node_predictions": epoch_train_loss_node_predictions / len(train_dl),
                     "train_loss-mode_stats": epoch_train_loss_mode_stats / len(train_dl),
                     "val_loss-node_predictions": val_loss_node_predictions,
                     "val_loss-mode_stats": val_loss_mode_stats,
                     "epoch":epoch})
             else:
-                val_loss, r_squared, spearman_corr, pearson_corr = validate_model_during_training(
+                val_loss, r_squared, spearman_corr, pearson_corr, mae, normalized_mae = validate_model_during_training(
                     config=config,
                     model=self,
                     dataset=valid_dl,
@@ -239,9 +241,11 @@ class BaseGNN(nn.Module, ABC):
                     "r^2": r_squared,
                     "spearman": spearman_corr,
                     "pearson": pearson_corr,
+                    "mae": mae,
+                    "normalized_mae": normalized_mae,
                     "epoch":epoch})
 
-            print(f"epoch: {epoch}, validation loss: {val_loss}, lr: {lr}, r^2: {r_squared}")
+            print(f"epoch: {epoch}, validation loss: {val_loss}, lr: {lr}, r^2: {r_squared}, MAE: {mae:.6f}, Normalized MAE: {normalized_mae:.6f}")
             
             if val_loss < best_val_loss:
                 best_val_loss = val_loss   

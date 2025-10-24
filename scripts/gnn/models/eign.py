@@ -320,7 +320,7 @@ class EIGN(BaseGNN):
                     "Predicting mode stats is not implemented yet."
                 )
             else:
-                val_loss, r_squared, spearman_corr, pearson_corr = (
+                val_loss, r_squared, spearman_corr, pearson_corr, mae, normalized_mae = (
                     validate_model_during_training_eign(
                         config=config,
                         model=self,
@@ -339,11 +339,13 @@ class EIGN(BaseGNN):
                         "r^2": r_squared,
                         "spearman": spearman_corr,
                         "pearson": pearson_corr,
+                        "mae": mae,
+                        "normalized_mae": normalized_mae,
                     }
                 )
 
             print(
-                f"epoch: {epoch}, validation loss: {val_loss}, lr: {lr}, r^2: {r_squared}"
+                f"epoch: {epoch}, validation loss: {val_loss}, lr: {lr}, r^2: {r_squared}, MAE: {mae:.6f}, Normalized MAE: {normalized_mae:.6f}"
             )
 
             if val_loss < best_val_loss:
